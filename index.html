@@ -123,6 +123,19 @@
     }
   });
 
+  var voiceBoosted = false, VOICE_GAIN = 2.5;   // Verstärkung: 1 = unverändert, höher = lauter
+  function boostVoice() {
+    if (voiceBoosted || !audioCtx || audioCtx.state !== 'running') return;
+    try {
+      var src = audioCtx.createMediaElementSource(voice);
+      var gain = audioCtx.createGain();
+      gain.gain.value = VOICE_GAIN;
+      var comp = audioCtx.createDynamicsCompressor();   // verhindert Übersteuern
+      src.connect(gain); gain.connect(comp); comp.connect(audioCtx.destination);
+      voiceBoosted = true;
+    } catch (e) {}
+  }
+
   function unlockAudio() {
     if (!voiceUnlocked && voice.readyState >= 2) {
       voiceUnlocked = true;
@@ -209,10 +222,11 @@
     setTimeout(function () {
       if (!alarmTimer) return;
       if (voice.readyState >= 2) {
-        voiceReps = 0;
-        try { voice.currentTime = 0; var pr = voice.play(); if (pr && pr.catch) pr.catch(function () { speak(2); }); } catch (e) { speak(2); }
+        voiceReps = 2;   // nur einmal abspielen
+        boostVoice();
+        try { voice.currentTime = 0; var pr = voice.play(); if (pr && pr.catch) pr.catch(function () { speak(1); }); } catch (e) { speak(1); }
       } else {
-        speak(2);
+        speak(1);
       }
     }, 1100);
     alarmTimer = setTimeout(stopAlarm, 8000);

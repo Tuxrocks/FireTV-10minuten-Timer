@@ -8,8 +8,8 @@
   html, body { margin: 0; height: 100%; background: #1c1c2e; color: #f2f2f2;
     font-family: Roboto, Arial, sans-serif; overflow: hidden; }
   body { display: flex; flex-direction: column; align-items: center; justify-content: center; }
-  #time { font-size: 26vw; font-weight: 900; line-height: 1; letter-spacing: -0.02em; }
-  #status { margin-top: 3vh; font-size: 3vw; }
+  #time { font-size: 34vw; font-weight: 900; line-height: 1; letter-spacing: -0.02em; }
+  #status { margin-top: 1vh; font-size: 3.4vw; }
   #buttons { margin-top: 3vh; display: flex; gap: 3vw; min-height: 9vh; }
   button { font: inherit; font-size: 2.6vw; font-weight: 600; color: #f2f2f2; background: transparent;
     border: 0.25vw solid #888; border-radius: 1vw; padding: 1.2vh 3vw; outline: none; }
@@ -28,7 +28,6 @@
     <button id="bResume" class="hidden">« WEITER</button>
     <button id="bRestart" class="hidden">NEUSTART »</button>
   </div>
-  <div id="dbg" style="position:fixed;left:1vw;bottom:1vh;font-size:1.4vw;opacity:.45">v5</div>
   <div id="hint">OK / Enter = Start · Vollbild nach Start</div>
 
 <script>
@@ -102,7 +101,7 @@
       statusEl.textContent = 'Bereit';
       hintEl.textContent = 'OK / Enter = Start · Vollbild nach Start';
     } else if (state === 'running') {
-      statusEl.textContent = 'Läuft · nächste Blind-Erhöhung bei 00:00';
+      statusEl.textContent = 'bis zur nächsten Blind-Erhöhung';
       hintEl.textContent = 'Play/Pause oder OK = Pause';
     } else {
       statusEl.textContent = 'Pausiert';
@@ -143,8 +142,7 @@
   }
 
   // Anzeige der zuletzt erkannten Eingabe (zur Fehlersuche)
-  var dbg = document.getElementById('dbg');
-  function note(t) { dbg.textContent = 'v5 · ' + t; }
+  function note() {}
 
   function isPlayPause(e) {
     var k = e.key, c = e.keyCode;

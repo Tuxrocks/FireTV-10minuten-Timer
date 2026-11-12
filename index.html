@@ -24,7 +24,9 @@
   <div id="time">10:00</div>
   <div id="status">Bereit</div>
   <div id="buttons">
+    <button id="bMinus">− 1 MIN</button>
     <button id="bStart">START</button>
+    <button id="bPlus">+ 1 MIN</button>
     <button id="bResume" class="hidden">« WEITER</button>
     <button id="bRestart" class="hidden">NEUSTART »</button>
   </div>
@@ -32,10 +34,16 @@
 
 <script>
 (function () {
+  var STEP = 60 * 1000, MIN = 60 * 1000, MAX = 60 * 60 * 1000;
   var DURATION = 10 * 60 * 1000;
+  try {
+    var saved = parseInt(localStorage.getItem('blindTimerDuration'), 10);
+    if (saved >= MIN && saved <= MAX) DURATION = saved;
+  } catch (e) {}
+  var lastAdj = 0;
   var $ = function (id) { return document.getElementById(id); };
   var timeEl = $('time'), statusEl = $('status'), hintEl = $('hint');
-  var bStart = $('bStart'), bResume = $('bResume'), bRestart = $('bRestart');
+  var bMinus = $('bMinus'), bPlus = $('bPlus'), bStart = $('bStart'), bResume = $('bResume'), bRestart = $('bRestart');
 
   var state = 'ready';          // ready | running | paused
   var endAt = 0, remaining = DURATION;
@@ -95,11 +103,14 @@
     var paused = state === 'paused';
     document.body.classList.toggle('paused', paused);
     bStart.classList.toggle('hidden', state !== 'ready');
+    bMinus.classList.toggle('hidden', state !== 'ready');
+    bPlus.classList.toggle('hidden', state !== 'ready');
+    if (state === 'ready') timeEl.textContent = fmt(DURATION);
     bResume.classList.toggle('hidden', !paused);
     bRestart.classList.toggle('hidden', !paused);
     if (state === 'ready') {
       statusEl.textContent = 'Bereit';
-      hintEl.textContent = 'OK / Enter = Start · Vollbild nach Start';
+      hintEl.textContent = 'OK = Start · Pfeil hoch/runter oder − / + = Zeit einstellen';
     } else if (state === 'running') {
       statusEl.textContent = 'bis zur nächsten Blind-Erhöhung';
       hintEl.textContent = 'Play/Pause oder OK = Pause';
@@ -107,6 +118,16 @@
       statusEl.textContent = 'Pausiert';
       hintEl.textContent = '« Zurückspulen = Weiter · Vorspulen » = Neustart · Play/Pause = Weiter';
     }
+  }
+
+  function adjust(dir) {
+    if (state !== 'ready') return;
+    var now = Date.now();
+    if (now - lastAdj < 250) return;
+    lastAdj = now;
+    DURATION = Math.min(MAX, Math.max(MIN, DURATION + dir * STEP));
+    try { localStorage.setItem('blindTimerDuration', String(DURATION)); } catch (e) {}
+    timeEl.textContent = fmt(DURATION);
   }
 
   function start(fromMs) {
@@ -184,14 +205,23 @@
     if (isFF(e))  { e.preventDefault(); if (state === 'paused' && gate()) start(DURATION); return; }
     if (isPlayPause(e)) { e.preventDefault(); toggle(); return; }
     if (isOk(e)) { e.preventDefault(); activate(null); return; }
+    if (e.type === 'keydown' && state === 'ready') {
+      var kk = e.key, cc = e.keyCode;
+      if (kk === 'ArrowUp' || kk === 'ArrowRight' || cc === 19 || cc === 22 || cc === 38 || cc === 39) { e.preventDefault(); adjust(1); return; }
+      if (kk === 'ArrowDown' || kk === 'ArrowLeft' || cc === 20 || cc === 21 || cc === 40 || cc === 37) { e.preventDefault(); adjust(-1); return; }
+    }
     if (e.type === 'keydown' && state === 'paused') {
       if (e.key === 'ArrowLeft' || e.keyCode === 21 || e.keyCode === 37) { e.preventDefault(); bResume.focus(); }
       else if (e.key === 'ArrowRight' || e.keyCode === 22 || e.keyCode === 39) { e.preventDefault(); bRestart.focus(); }
     }
   }
   function onPointer(e) {
-    note(e.type);
-    activate(e.target);
+    var t = e.target;
+    if (t === bMinus || t === bPlus) {
+      if (state === 'ready') adjust(t === bPlus ? 1 : -1);
+      return;
+    }
+    activate(t);
   }
 
   // an window (Capture-Phase) hängen, damit nichts die Eingabe verschluckt

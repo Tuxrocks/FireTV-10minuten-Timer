@@ -25,9 +25,10 @@
   <div id="status">Bereit</div>
   <div id="buttons">
     <button id="bStart">START</button>
-    <button id="bResume" class="hidden">WEITER</button>
-    <button id="bRestart" class="hidden">NEUSTART</button>
+    <button id="bResume" class="hidden">« WEITER</button>
+    <button id="bRestart" class="hidden">NEUSTART »</button>
   </div>
+  <div id="dbg" style="position:fixed;left:1vw;bottom:1vh;font-size:1.4vw;opacity:.45">v5</div>
   <div id="hint">OK / Enter = Start · Vollbild nach Start</div>
 
 <script>
@@ -102,10 +103,10 @@
       hintEl.textContent = 'OK / Enter = Start · Vollbild nach Start';
     } else if (state === 'running') {
       statusEl.textContent = 'Läuft · nächste Blind-Erhöhung bei 00:00';
-      hintEl.textContent = 'OK / Enter = Pause';
+      hintEl.textContent = 'Play/Pause oder OK = Pause';
     } else {
       statusEl.textContent = 'Pausiert';
-      hintEl.textContent = 'Links/Rechts = Auswahl · OK / Enter = bestätigen';
+      hintEl.textContent = '« Zurückspulen = Weiter · Vorspulen » = Neustart · Play/Pause = Weiter';
     }
   }
 
@@ -141,23 +142,67 @@
     }
   }
 
-  document.addEventListener('keydown', function (e) {
-    var k = e.key, c = e.keyCode;
-    if (k === 'Enter' || k === ' ' || c === 13 || c === 23 || c === 66) {
-      e.preventDefault(); activate(null);
-    } else if (c === 85 || c === 126 || c === 127) {          // Play/Pause-Taste
-      e.preventDefault();
-      unlockAudio();
-      if (state === 'running') pause(); else start(state === 'paused' ? remaining : DURATION);
-    } else if (state === 'paused' && (k === 'ArrowLeft' || c === 21)) {
-      e.preventDefault(); bResume.focus();
-    } else if (state === 'paused' && (k === 'ArrowRight' || c === 22)) {
-      e.preventDefault(); bRestart.focus();
-    }
-  });
+  // Anzeige der zuletzt erkannten Eingabe (zur Fehlersuche)
+  var dbg = document.getElementById('dbg');
+  function note(t) { dbg.textContent = 'v5 · ' + t; }
 
-  // Klick (Silk-Cursor-Modus: OK-Taste = Klick) – egal wo der Mauszeiger steht
-  document.addEventListener('click', function (e) { activate(e.target); });
+  function isPlayPause(e) {
+    var k = e.key, c = e.keyCode;
+    return k === 'MediaPlayPause' || k === 'MediaPlay' || k === 'MediaPause' ||
+           c === 179 || c === 85 || c === 126 || c === 127;
+  }
+  function isOk(e) {
+    var k = e.key, c = e.keyCode;
+    return k === 'Enter' || k === ' ' || k === 'Select' || c === 13 || c === 23 || c === 66 || c === 32;
+  }
+  function isRew(e) {
+    var k = e.key, c = e.keyCode;
+    return k === 'MediaRewind' || k === 'MediaTrackPrevious' || c === 227 || c === 89 || c === 177;
+  }
+  function isFF(e) {
+    var k = e.key, c = e.keyCode;
+    return k === 'MediaFastForward' || k === 'MediaTrackNext' || c === 228 || c === 90 || c === 176;
+  }
+  function gate() {
+    var now = Date.now();
+    if (now - lastPress < 400) return false;
+    lastPress = now;
+    unlockAudio();
+    return true;
+  }
+  function toggle() {
+    var now = Date.now();
+    if (now - lastPress < 400) return;
+    lastPress = now;
+    unlockAudio();
+    if (state === 'running') pause();
+    else if (state === 'paused') start(remaining);
+    else start(DURATION);
+  }
+
+  function onKey(e) {
+    note(e.type + ' key=' + e.key + ' code=' + e.keyCode);
+    if (isRew(e)) { e.preventDefault(); if (state === 'paused' && gate()) start(remaining); return; }
+    if (isFF(e))  { e.preventDefault(); if (state === 'paused' && gate()) start(DURATION); return; }
+    if (isPlayPause(e)) { e.preventDefault(); toggle(); return; }
+    if (isOk(e)) { e.preventDefault(); activate(null); return; }
+    if (e.type === 'keydown' && state === 'paused') {
+      if (e.key === 'ArrowLeft' || e.keyCode === 21 || e.keyCode === 37) { e.preventDefault(); bResume.focus(); }
+      else if (e.key === 'ArrowRight' || e.keyCode === 22 || e.keyCode === 39) { e.preventDefault(); bRestart.focus(); }
+    }
+  }
+  function onPointer(e) {
+    note(e.type);
+    activate(e.target);
+  }
+
+  // an window (Capture-Phase) hängen, damit nichts die Eingabe verschluckt
+  window.addEventListener('keydown', onKey, true);
+  window.addEventListener('keyup', onKey, true);
+  window.addEventListener('click', onPointer, true);
+  window.addEventListener('mouseup', onPointer, true);
+  window.addEventListener('pointerup', onPointer, true);
+  window.addEventListener('touchend', onPointer, true);
 
   setInterval(function () {
     if (state !== 'running') return;

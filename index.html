@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Blind-Timer</title>
 <style>
-  html, body { margin: 0; height: 100%; background: #1c1c2e; color: #f2f2f2;
+  html { background: #0d3d28; }
+  html, body { margin: 0; height: 100%; color: #f2f2f2;
     font-family: Roboto, Arial, sans-serif; overflow: hidden; }
   body { display: flex; flex-direction: column; align-items: center; justify-content: center; }
   #time { font-size: 34vw; font-weight: 900; line-height: 1; letter-spacing: -0.02em; }
@@ -17,10 +18,44 @@
   #hint { margin-top: 2vh; font-size: 1.8vw; opacity: .8; }
   body.alarm #time { color: #ff5252; }
   body.paused #time { opacity: .55; }
+  #bg { position: fixed; left: 0; top: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+  #bg svg { width: 100%; height: 100%; display: block; }
+  #time, #status, #hint { text-shadow: 0 0.4vw 1.2vw rgba(0,0,0,.65); }
+  button { background: rgba(0,0,0,.5); }
   .hidden { display: none; }
 </style>
 </head>
 <body>
+  <div id="bg">
+  <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="felt" cx="50%" cy="50%" r="60%">
+        <stop offset="0" stop-color="#27824f"/>
+        <stop offset="1" stop-color="#0d3d28"/>
+      </radialGradient>
+      <linearGradient id="wood" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#3b2314"/>
+        <stop offset="1" stop-color="#1d110a"/>
+      </linearGradient>
+      <path id="suitH" d="M0 30 C-60 -10 -40 -50 0 -22 C40 -50 60 -10 0 30Z"/>
+      <path id="suitS" d="M0 -34 C-55 10 -35 38 -6 18 C-6 34 -10 40 -16 44 L16 44 C10 40 6 34 6 18 C35 38 55 10 0 -34Z"/>
+    </defs>
+    <rect width="1600" height="900" fill="url(#wood)"/>
+    <ellipse cx="800" cy="450" rx="780" ry="420" fill="#14110f"/>
+    <ellipse cx="800" cy="450" rx="760" ry="400" fill="url(#felt)"/>
+    <ellipse cx="800" cy="450" rx="640" ry="300" fill="none" stroke="#e8c85a" stroke-opacity=".35" stroke-width="4" stroke-dasharray="18 14"/>
+    <g id="chips"></g>
+    <g transform="translate(150,440) rotate(-14)">
+      <g transform="translate(26,6) rotate(10)"><rect x="-55" y="-78" width="110" height="156" rx="10" fill="#f4f1ea" stroke="#bbb" stroke-width="2"/><text x="-40" y="-42" font-family="Arial,sans-serif" font-size="34" font-weight="700" fill="#c62828">A</text><use href="#suitH" x="0" y="10" fill="#c62828" transform="translate(0,10) scale(1.2)"/></g>
+      <g><rect x="-55" y="-78" width="110" height="156" rx="10" fill="#f4f1ea" stroke="#bbb" stroke-width="2"/><text x="-40" y="-42" font-family="Arial,sans-serif" font-size="34" font-weight="700" fill="#111">A</text><use href="#suitS" fill="#111" transform="translate(0,10) scale(1.2)"/></g>
+    </g>
+    <g transform="translate(1450,450) rotate(12)">
+      <g transform="translate(-26,6) rotate(-10)"><rect x="-55" y="-78" width="110" height="156" rx="10" fill="#f4f1ea" stroke="#bbb" stroke-width="2"/><text x="-40" y="-42" font-family="Arial,sans-serif" font-size="34" font-weight="700" fill="#c62828">K</text><use href="#suitH" fill="#c62828" transform="translate(0,10) scale(1.2)"/></g>
+      <g><rect x="-55" y="-78" width="110" height="156" rx="10" fill="#f4f1ea" stroke="#bbb" stroke-width="2"/><text x="-40" y="-42" font-family="Arial,sans-serif" font-size="34" font-weight="700" fill="#111">K</text><use href="#suitS" fill="#111" transform="translate(0,10) scale(1.2)"/></g>
+    </g>
+    <rect width="1600" height="900" fill="#000" opacity=".38"/>
+  </svg>
+</div>
   <div id="time">10:00</div>
   <div id="status">Bereit</div>
   <div id="buttons">
@@ -29,9 +64,28 @@
     <button id="bPlus">+ 1 MIN</button>
     <button id="bResume" class="hidden">« WEITER</button>
     <button id="bRestart" class="hidden">NEUSTART »</button>
+    <button id="bBack" class="hidden">ZEIT ÄNDERN</button>
   </div>
   <div id="hint">OK / Enter = Start · Vollbild nach Start</div>
 
+<script>
+(function () {
+  var NS = 'http://www.w3.org/2000/svg', g = document.getElementById('chips');
+  function el(n, a) { var e = document.createElementNS(NS, n); for (var k in a) e.setAttribute(k, a[k]); g.appendChild(e); return e; }
+  function stack(x, y, fill, ring, n) {
+    for (var i = 0; i < n; i++) {
+      var cy = y - i * 9, cx = x + (i % 2 ? 2 : -2);
+      el('circle', { cx: cx + 3, cy: cy + 5, r: 44, fill: '#000', opacity: .3 });
+      el('circle', { cx: cx, cy: cy, r: 44, fill: fill, stroke: ring, 'stroke-width': 2 });
+      el('circle', { cx: cx, cy: cy, r: 35, fill: 'none', stroke: ring, 'stroke-width': 8, 'stroke-dasharray': '11 9' });
+      el('circle', { cx: cx, cy: cy, r: 22, fill: fill, stroke: ring, 'stroke-width': 2 });
+    }
+  }
+  var R = '#c62828', B = '#1565c0', K = '#222', G = '#2e7d32', W = '#eceff1';
+  stack(290, 665, R, '#fff', 5);  stack(215, 595, K, '#fff', 3);  stack(345, 600, B, '#fff', 3);
+  stack(1310, 665, G, '#fff', 5); stack(1385, 595, W, '#555', 3); stack(1255, 600, K, '#fff', 3);
+})();
+</script>
 <script>
 (function () {
   var STEP = 60 * 1000, MIN = 60 * 1000, MAX = 60 * 60 * 1000;
@@ -43,7 +97,7 @@
   var lastAdj = 0;
   var $ = function (id) { return document.getElementById(id); };
   var timeEl = $('time'), statusEl = $('status'), hintEl = $('hint');
-  var bMinus = $('bMinus'), bPlus = $('bPlus'), bStart = $('bStart'), bResume = $('bResume'), bRestart = $('bRestart');
+  var bMinus = $('bMinus'), bPlus = $('bPlus'), bStart = $('bStart'), bResume = $('bResume'), bRestart = $('bRestart'), bBack = $('bBack');
 
   var state = 'ready';          // ready | running | paused
   var endAt = 0, remaining = DURATION;
@@ -77,26 +131,58 @@
   function stopAlarm() {
     if (alarmTimer) { clearTimeout(alarmTimer); alarmTimer = null; }
     document.body.classList.remove('alarm');
+    stopSpeech();
+  }
+
+  // Sanfter Glockenklang (drei aufsteigende Töne)
+  function chime() {
+    if (!audioCtx) return;
+    var notes = [659.25, 783.99, 1046.5];   // E5, G5, C6
+    for (var i = 0; i < notes.length; i++) {
+      var t0 = audioCtx.currentTime + i * 0.32;
+      [1, 2.01, 3.02].forEach(function (mult, j) {
+        var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = 'sine';
+        o.frequency.value = notes[i] * mult;
+        var vol = [0.22, 0.08, 0.03][j];
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.6);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(t0); o.stop(t0 + 1.7);
+      });
+    }
+  }
+
+  // Sprachansage "Blinderhöhung" (falls der Browser eine deutsche Stimme hat)
+  function speak(times) {
+    try {
+      var ss = window.speechSynthesis;
+      if (!ss || !window.SpeechSynthesisUtterance) return;
+      var voices = ss.getVoices ? ss.getVoices() : [];
+      var de = null, i;
+      for (i = 0; i < voices.length; i++) {
+        if (/^de/i.test(voices[i].lang)) { de = de || voices[i]; if (/google|neural|natural/i.test(voices[i].name)) { de = voices[i]; break; } }
+      }
+      for (i = 0; i < times; i++) {
+        var u = new SpeechSynthesisUtterance('Blinderhöhung!');
+        u.lang = 'de-DE';
+        if (de) u.voice = de;
+        u.rate = 0.9; u.pitch = 1; u.volume = 1;
+        ss.speak(u);
+      }
+    } catch (e) {}
+  }
+
+  function stopSpeech() {
+    try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {}
   }
 
   function playHorn() {
     document.body.classList.add('alarm');
-    if (audioCtx) {
-      for (var i = 0; i < 3; i++) {
-        var t0 = audioCtx.currentTime + i * 1.4;
-        var o1 = audioCtx.createOscillator(), o2 = audioCtx.createOscillator();
-        var g = audioCtx.createGain();
-        o1.type = 'sawtooth'; o2.type = 'square';
-        o1.frequency.value = 220; o2.frequency.value = 223;
-        g.gain.setValueAtTime(0.0001, t0);
-        g.gain.exponentialRampToValueAtTime(0.5, t0 + 0.05);
-        g.gain.setValueAtTime(0.5, t0 + 1.0);
-        g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.1);
-        o1.connect(g); o2.connect(g); g.connect(audioCtx.destination);
-        o1.start(t0); o2.start(t0); o1.stop(t0 + 1.15); o2.stop(t0 + 1.15);
-      }
-    }
-    alarmTimer = setTimeout(stopAlarm, 4500);
+    chime();
+    setTimeout(function () { speak(2); }, 1100);
+    alarmTimer = setTimeout(stopAlarm, 8000);
   }
 
   function render() {
@@ -108,6 +194,7 @@
     if (state === 'ready') timeEl.textContent = fmt(DURATION);
     bResume.classList.toggle('hidden', !paused);
     bRestart.classList.toggle('hidden', !paused);
+    bBack.classList.toggle('hidden', !paused);
     if (state === 'ready') {
       statusEl.textContent = 'Bereit';
       hintEl.textContent = 'OK = Start · Pfeil hoch/runter oder − / + = Zeit einstellen';
@@ -116,7 +203,7 @@
       hintEl.textContent = 'Play/Pause oder OK = Pause';
     } else {
       statusEl.textContent = 'Pausiert';
-      hintEl.textContent = '« Zurückspulen = Weiter · Vorspulen » = Neustart · Play/Pause = Weiter';
+      hintEl.textContent = '« Weiter · Neustart » · Pfeil hoch = Zeit ändern (zurück zur Startseite)';
     }
   }
 
@@ -128,6 +215,13 @@
     DURATION = Math.min(MAX, Math.max(MIN, DURATION + dir * STEP));
     try { localStorage.setItem('blindTimerDuration', String(DURATION)); } catch (e) {}
     timeEl.textContent = fmt(DURATION);
+  }
+
+  function goReady() {
+    stopAlarm();
+    state = 'ready';
+    render();
+    bStart.focus();
   }
 
   function start(fromMs) {
@@ -156,8 +250,9 @@
     if (state === 'ready') start(DURATION);
     else if (state === 'running') pause();
     else {
-      var pick = (target === bRestart || target === bResume) ? target : document.activeElement;
-      if (pick === bRestart) start(DURATION);
+      var pick = (target === bRestart || target === bResume || target === bBack) ? target : document.activeElement;
+      if (pick === bBack) goReady();
+      else if (pick === bRestart) start(DURATION);
       else start(remaining);             // WEITER (Standard)
     }
   }
@@ -211,8 +306,12 @@
       if (kk === 'ArrowDown' || kk === 'ArrowLeft' || cc === 20 || cc === 21 || cc === 40 || cc === 37) { e.preventDefault(); adjust(-1); return; }
     }
     if (e.type === 'keydown' && state === 'paused') {
-      if (e.key === 'ArrowLeft' || e.keyCode === 21 || e.keyCode === 37) { e.preventDefault(); bResume.focus(); }
-      else if (e.key === 'ArrowRight' || e.keyCode === 22 || e.keyCode === 39) { e.preventDefault(); bRestart.focus(); }
+      var k2 = e.key, c2 = e.keyCode;
+      var order = [bResume, bRestart, bBack], idx = order.indexOf(document.activeElement);
+      if (idx < 0) idx = 0;
+      if (k2 === 'ArrowUp' || c2 === 19 || c2 === 38) { e.preventDefault(); if (gate()) goReady(); }
+      else if (k2 === 'ArrowLeft' || c2 === 21 || c2 === 37) { e.preventDefault(); order[Math.max(0, idx - 1)].focus(); }
+      else if (k2 === 'ArrowRight' || c2 === 22 || c2 === 39) { e.preventDefault(); order[Math.min(2, idx + 1)].focus(); }
     }
   }
   function onPointer(e) {

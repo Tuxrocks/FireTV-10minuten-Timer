@@ -26,6 +26,12 @@
 </style>
 </head>
 <body>
+  <audio id="voice" preload="auto">
+    <source src="blinderhoehung.mp3" type="audio/mpeg">
+    <source src="blinderhoehung.m4a" type="audio/mp4">
+    <source src="blinderhoehung.wav" type="audio/wav">
+    <source src="blinderhoehung.ogg" type="audio/ogg">
+  </audio>
   <div id="bg">
   <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
     <defs>
@@ -109,7 +115,24 @@
     return (m < 10 ? '0' : '') + m + ':' + (r < 10 ? '0' : '') + r;
   }
 
+  var voice = document.getElementById('voice'), voiceReps = 2, voiceUnlocked = false;
+  voice.addEventListener('ended', function () {
+    if (voiceReps < 1 && alarmTimer) {
+      voiceReps++;
+      setTimeout(function () { if (alarmTimer) { try { voice.currentTime = 0; voice.play(); } catch (e) {} } }, 600);
+    }
+  });
+
   function unlockAudio() {
+    if (!voiceUnlocked && voice.readyState >= 2) {
+      voiceUnlocked = true;
+      try {
+        voice.muted = true;
+        var pr = voice.play();
+        var done = function () { voice.pause(); voice.currentTime = 0; voice.muted = false; };
+        if (pr && pr.then) pr.then(done, function () { voice.muted = false; voiceUnlocked = false; }); else done();
+      } catch (e) { voice.muted = false; }
+    }
     try {
       var AC = window.AudioContext || window.webkitAudioContext;
       if (!audioCtx && AC) audioCtx = new AC();
@@ -175,13 +198,23 @@
   }
 
   function stopSpeech() {
+    voiceReps = 2;
+    try { voice.pause(); voice.currentTime = 0; } catch (e) {}
     try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {}
   }
 
   function playHorn() {
     document.body.classList.add('alarm');
     chime();
-    setTimeout(function () { speak(2); }, 1100);
+    setTimeout(function () {
+      if (!alarmTimer) return;
+      if (voice.readyState >= 2) {
+        voiceReps = 0;
+        try { voice.currentTime = 0; var pr = voice.play(); if (pr && pr.catch) pr.catch(function () { speak(2); }); } catch (e) { speak(2); }
+      } else {
+        speak(2);
+      }
+    }, 1100);
     alarmTimer = setTimeout(stopAlarm, 8000);
   }
 

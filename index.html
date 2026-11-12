@@ -1,73 +1,179 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>10-Minuten-Dauertimer</title>
+<title>Blind-Timer</title>
 <style>
-:root{color-scheme:dark}
-*{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;background:#000;color:#fff;font-family:Arial,Helvetica,sans-serif}
-body{display:flex;align-items:center;justify-content:center;overflow:hidden}
-main{text-align:center;width:100%;padding:3vw}
-#time{font-size:clamp(6rem,27vw,24rem);font-weight:800;letter-spacing:-.06em;font-variant-numeric:tabular-nums;line-height:1}
-#status{font-size:clamp(1rem,3vw,2rem);margin-top:4vh;color:#bbb}
-#start{margin-top:4vh;font-size:clamp(1.1rem,3vw,2rem);padding:.6em 1.2em;border:2px solid #fff;border-radius:12px;background:#111;color:#fff}
-#hint{font-size:clamp(.8rem,1.7vw,1.2rem);color:#777;margin-top:2vh}
+  html, body { margin: 0; height: 100%; background: #1c1c2e; color: #f2f2f2;
+    font-family: Roboto, Arial, sans-serif; overflow: hidden; }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  #time { font-size: 26vw; font-weight: 900; line-height: 1; letter-spacing: -0.02em; }
+  #status { margin-top: 3vh; font-size: 3vw; }
+  #buttons { margin-top: 3vh; display: flex; gap: 3vw; min-height: 9vh; }
+  button { font: inherit; font-size: 2.6vw; font-weight: 600; color: #f2f2f2; background: transparent;
+    border: 0.25vw solid #888; border-radius: 1vw; padding: 1.2vh 3vw; outline: none; }
+  button:focus { border-color: #fff; box-shadow: 0 0 0 0.3vw #fff; }
+  #hint { margin-top: 2vh; font-size: 1.8vw; opacity: .8; }
+  body.alarm #time { color: #ff5252; }
+  body.paused #time { opacity: .55; }
+  .hidden { display: none; }
 </style>
 </head>
 <body>
-<main>
   <div id="time">10:00</div>
   <div id="status">Bereit</div>
-  <button id="start">START</button>
-  <div id="hint">OK / Enter = Start oder Neustart · Vollbild nach Start</div>
-</main>
+  <div id="buttons">
+    <button id="bStart">START</button>
+    <button id="bResume" class="hidden">WEITER</button>
+    <button id="bRestart" class="hidden">NEUSTART</button>
+  </div>
+  <div id="hint">OK / Enter = Start · Vollbild nach Start</div>
+
 <script>
-let remaining=600, endAt=0, running=false, alarmTimer=null, interval=null, audioCtx=null;
-const timeEl=document.getElementById('time'), statusEl=document.getElementById('status'), startBtn=document.getElementById('start');
-function draw(){const m=Math.floor(remaining/60),s=remaining%60;timeEl.textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')}
-function alarm(){
-  try{
-    audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
-    if(audioCtx.state==='suspended') audioCtx.resume();
-    const now=audioCtx.currentTime;
-    // Originaler, kurzer, auf- und abschwellender Alarmton – keine Aufnahme.
-    for(let i=0;i<8;i++){
-      const o=audioCtx.createOscillator(),g=audioCtx.createGain();
-      o.type='sawtooth';
-      const t=now+i*.48;
-      o.frequency.setValueAtTime(520,t);
-      o.frequency.linearRampToValueAtTime(880,t+.22);
-      o.frequency.linearRampToValueAtTime(520,t+.44);
-      g.gain.setValueAtTime(.0001,t);
-      g.gain.linearRampToValueAtTime(.20,t+.04);
-      g.gain.setValueAtTime(.20,t+.38);
-      g.gain.linearRampToValueAtTime(.0001,t+.46);
-      o.connect(g);g.connect(audioCtx.destination);o.start(t);o.stop(t+.48);
+(function () {
+  var DURATION = 10 * 60 * 1000;
+  var $ = function (id) { return document.getElementById(id); };
+  var timeEl = $('time'), statusEl = $('status'), hintEl = $('hint');
+  var bStart = $('bStart'), bResume = $('bResume'), bRestart = $('bRestart');
+
+  var state = 'ready';          // ready | running | paused
+  var endAt = 0, remaining = DURATION;
+  var audioCtx = null, alarmTimer = null, lastPress = 0;
+
+  function fmt(ms) {
+    var s = Math.max(0, Math.ceil(ms / 1000));
+    var m = Math.floor(s / 60), r = s % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (r < 10 ? '0' : '') + r;
+  }
+
+  function unlockAudio() {
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!audioCtx && AC) audioCtx = new AC();
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    } catch (e) {}
+  }
+
+  function goFullscreen() {
+    try {
+      var el = document.documentElement;
+      var f = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen;
+      if (f && !(document.fullscreenElement || document.webkitFullscreenElement)) {
+        var p = f.call(el);
+        if (p && p.catch) p.catch(function () {});
+      }
+    } catch (e) {}
+  }
+
+  function stopAlarm() {
+    if (alarmTimer) { clearTimeout(alarmTimer); alarmTimer = null; }
+    document.body.classList.remove('alarm');
+  }
+
+  function playHorn() {
+    document.body.classList.add('alarm');
+    if (audioCtx) {
+      for (var i = 0; i < 3; i++) {
+        var t0 = audioCtx.currentTime + i * 1.4;
+        var o1 = audioCtx.createOscillator(), o2 = audioCtx.createOscillator();
+        var g = audioCtx.createGain();
+        o1.type = 'sawtooth'; o2.type = 'square';
+        o1.frequency.value = 220; o2.frequency.value = 223;
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(0.5, t0 + 0.05);
+        g.gain.setValueAtTime(0.5, t0 + 1.0);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.1);
+        o1.connect(g); o2.connect(g); g.connect(audioCtx.destination);
+        o1.start(t0); o2.start(t0); o1.stop(t0 + 1.15); o2.stop(t0 + 1.15);
+      }
     }
-  }catch(e){}
-}
-function start(){
-  clearTimeout(alarmTimer); remaining=600; endAt=Date.now()+600000; running=true;
-  statusEl.textContent='Läuft · nächster Alarm bei 00:00';startBtn.hidden=true;
-  try{if(!document.fullscreenElement)document.documentElement.requestFullscreen?.()}catch(e){}
-  clearInterval(interval);
-  interval=setInterval(()=>{
-    remaining=Math.max(0,Math.ceil((endAt-Date.now())/1000));draw();
-    if(remaining<=0){
-      clearInterval(interval);running=false;statusEl.textContent='ALARM! Neuer Durchlauf startet …';
-      alarm();
-      alarmTimer=setTimeout(start,4500);
+    alarmTimer = setTimeout(stopAlarm, 4500);
+  }
+
+  function render() {
+    var paused = state === 'paused';
+    document.body.classList.toggle('paused', paused);
+    bStart.classList.toggle('hidden', state !== 'ready');
+    bResume.classList.toggle('hidden', !paused);
+    bRestart.classList.toggle('hidden', !paused);
+    if (state === 'ready') {
+      statusEl.textContent = 'Bereit';
+      hintEl.textContent = 'OK / Enter = Start · Vollbild nach Start';
+    } else if (state === 'running') {
+      statusEl.textContent = 'Läuft · nächste Blind-Erhöhung bei 00:00';
+      hintEl.textContent = 'OK / Enter = Pause';
+    } else {
+      statusEl.textContent = 'Pausiert';
+      hintEl.textContent = 'Links/Rechts = Auswahl · OK / Enter = bestätigen';
     }
-  },200);
-  draw();
-}
-startBtn.addEventListener('click',start);
-document.addEventListener('keydown',e=>{
-  if(['Enter',' ','OK','Select'].includes(e.key)){e.preventDefault();start()}
-});
-draw();
+  }
+
+  function start(fromMs) {
+    stopAlarm();
+    remaining = fromMs;
+    endAt = Date.now() + remaining;
+    state = 'running';
+    timeEl.textContent = fmt(remaining);
+    render();
+    goFullscreen();
+  }
+  function pause() {
+    remaining = Math.max(0, endAt - Date.now());
+    state = 'paused';
+    timeEl.textContent = fmt(remaining);
+    render();
+    bResume.focus();
+  }
+
+  // OK-Taste: je nach Zustand
+  function activate() {
+    var now = Date.now();
+    if (now - lastPress < 400) return;   // keydown + click nicht doppelt zählen
+    lastPress = now;
+    unlockAudio();
+    var a = document.activeElement;
+    if (state === 'ready') start(DURATION);
+    else if (state === 'running') pause();
+    else if (a === bRestart) start(DURATION);
+    else start(remaining);               // WEITER (Standard)
+  }
+
+  document.addEventListener('keydown', function (e) {
+    var k = e.key, c = e.keyCode;
+    if (k === 'Enter' || k === ' ' || c === 13 || c === 23 || c === 66) {
+      e.preventDefault(); activate();
+    } else if (c === 85 || c === 126 || c === 127) {          // Play/Pause-Taste
+      e.preventDefault();
+      unlockAudio();
+      if (state === 'running') pause(); else start(state === 'paused' ? remaining : DURATION);
+    } else if (state === 'paused' && (k === 'ArrowLeft' || c === 21)) {
+      e.preventDefault(); bResume.focus();
+    } else if (state === 'paused' && (k === 'ArrowRight' || c === 22)) {
+      e.preventDefault(); bRestart.focus();
+    }
+  });
+
+  // Klick (Cursor-Modus / Maus): Buttons direkt, sonst wie OK
+  bStart.addEventListener('click', function (e) { e.stopPropagation(); bStart.focus(); activate(); });
+  bResume.addEventListener('click', function (e) { e.stopPropagation(); bResume.focus(); activate(); });
+  bRestart.addEventListener('click', function (e) { e.stopPropagation(); bRestart.focus(); activate(); });
+
+  setInterval(function () {
+    if (state !== 'running') return;
+    var left = endAt - Date.now();
+    if (left <= 0) {
+      timeEl.textContent = '00:00';
+      playHorn();
+      endAt = Date.now() + DURATION;     // nächste Runde startet automatisch
+    } else {
+      timeEl.textContent = fmt(left);
+    }
+  }, 200);
+
+  render();
+  bStart.focus();
+})();
 </script>
 </body>
 </html>

@@ -126,23 +126,25 @@
     bResume.focus();
   }
 
-  // OK-Taste: je nach Zustand
-  function activate() {
+  // OK-Taste / Klick: je nach Zustand
+  function activate(target) {
     var now = Date.now();
     if (now - lastPress < 400) return;   // keydown + click nicht doppelt zählen
     lastPress = now;
     unlockAudio();
-    var a = document.activeElement;
     if (state === 'ready') start(DURATION);
     else if (state === 'running') pause();
-    else if (a === bRestart) start(DURATION);
-    else start(remaining);               // WEITER (Standard)
+    else {
+      var pick = (target === bRestart || target === bResume) ? target : document.activeElement;
+      if (pick === bRestart) start(DURATION);
+      else start(remaining);             // WEITER (Standard)
+    }
   }
 
   document.addEventListener('keydown', function (e) {
     var k = e.key, c = e.keyCode;
     if (k === 'Enter' || k === ' ' || c === 13 || c === 23 || c === 66) {
-      e.preventDefault(); activate();
+      e.preventDefault(); activate(null);
     } else if (c === 85 || c === 126 || c === 127) {          // Play/Pause-Taste
       e.preventDefault();
       unlockAudio();
@@ -154,10 +156,8 @@
     }
   });
 
-  // Klick (Cursor-Modus / Maus): Buttons direkt, sonst wie OK
-  bStart.addEventListener('click', function (e) { e.stopPropagation(); bStart.focus(); activate(); });
-  bResume.addEventListener('click', function (e) { e.stopPropagation(); bResume.focus(); activate(); });
-  bRestart.addEventListener('click', function (e) { e.stopPropagation(); bRestart.focus(); activate(); });
+  // Klick (Silk-Cursor-Modus: OK-Taste = Klick) – egal wo der Mauszeiger steht
+  document.addEventListener('click', function (e) { activate(e.target); });
 
   setInterval(function () {
     if (state !== 'running') return;

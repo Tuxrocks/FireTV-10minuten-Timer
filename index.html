@@ -126,7 +126,7 @@
     }
   });
 
-  var voiceBoosted = false, VOICE_GAIN = 2.5;   // Verstärkung: 1 = unverändert, höher = lauter
+  var voiceBoosted = false, VOICE_GAIN = 1.5;   // Verstärkung: 1 = unverändert, höher = lauter
   function boostVoice() {
     if (voiceBoosted || !audioCtx || audioCtx.state !== 'running') return;
     try {

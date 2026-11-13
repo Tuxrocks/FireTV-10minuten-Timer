@@ -126,7 +126,7 @@
     }
   });
 
-  var voiceBoosted = false, VOICE_GAIN = 1.5;   // Verstärkung: 1 = unverändert, höher = lauter
+  var voiceBoosted = false, VOICE_GAIN = 1.2;   // Lautstärke der Sprachdatei: 1 = Original, höher = lauter
   function boostVoice() {
     if (voiceBoosted || !audioCtx || audioCtx.state !== 'running') return;
     try {
@@ -174,8 +174,13 @@
   }
 
   // Sanfter Glockenklang (drei aufsteigende Töne)
+  var CHIME_GAIN = 2.4;   // Lautstärke des Glockenklangs: höher = lauter
   function chime() {
     if (!audioCtx) return;
+    var master = audioCtx.createGain();
+    master.gain.value = CHIME_GAIN;
+    var comp = audioCtx.createDynamicsCompressor();   // verhindert Übersteuern
+    master.connect(comp); comp.connect(audioCtx.destination);
     var notes = [659.25, 783.99, 1046.5];   // E5, G5, C6
     for (var i = 0; i < notes.length; i++) {
       var t0 = audioCtx.currentTime + i * 0.32;
@@ -187,7 +192,7 @@
         g.gain.setValueAtTime(0.0001, t0);
         g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
         g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.6);
-        o.connect(g); g.connect(audioCtx.destination);
+        o.connect(g); g.connect(master);
         o.start(t0); o.stop(t0 + 1.7);
       });
     }
